@@ -23,10 +23,26 @@
 // OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 extern crate soundcloud;
+extern crate tokio_core;
+extern crate futures;
+
+use futures::future::Future;
+use std::io::Write;
 
 fn main() {
-    let soundcloud_client_id = std::env::var("SOUNDCLOUD_CLIENT_ID")
-        .expect("SOUNDCLOUD_CLIENT_ID");
-    let client = soundcloud::Client::new(&soundcloud_client_id);
-    let tracks = client.tracks().query(Some("noisia")).get();
+    let soundcloud_client_id = std::env::var("SOUNDCLOUD_CLIENT_ID").expect("SOUNDCLOUD_CLIENT_ID");
+    let mut core = tokio_core::reactor::Core::new().unwrap();
+
+    let client = soundcloud::Client::new(&soundcloud_client_id, &core.handle());
+    let work = client.tracks().query(Some("noisia")).get()
+        .and_then(|tracks| {
+            match tracks {
+                Some(tracks) => tracks.iter().for_each(|track| { std::io::stdout().write_all(format!("{}\n", track.title).as_ref()); } ),
+                None => { std::io::stdout().write("no tracks found".as_ref()).unwrap(); () }
+            };
+
+            Ok(())
+        });
+
+    core.run(work).unwrap();
 }
