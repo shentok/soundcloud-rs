@@ -14,16 +14,19 @@ use std::result;
 
 use hyper;
 use serde_json;
+use url;
 
 pub type Result<T> = result::Result<T, Error>;
 
 #[derive(Debug)]
 pub enum Error {
     ApiError(String),
+    ParseError(url::ParseError),
     JsonError(serde_json::Error),
     HttpError(hyper::Error),
     InvalidFilter(String),
     Io(io::Error),
+    UriError(hyper::error::UriError),
     TrackNotDownloadable,
     TrackNotStreamable,
 }
@@ -34,7 +37,9 @@ impl fmt::Display for Error {
             Error::JsonError(ref error) => write!(f, "JSON error: {}", error),
             Error::HttpError(ref error) => write!(f, "HTTP error: {}", error),
             Error::ApiError(ref error) => write!(f, "SoundCloud error: {}", error),
+            Error::ParseError(ref error) => write!(f, "Parse error: {}", error),
             Error::Io(ref error) => write!(f, "IO error: {}", error),
+            Error::UriError(ref error) => write!(f, "URI error: {}", error),
             Error::InvalidFilter(_) => write!(f, "Invalid filter"),
             Error::TrackNotStreamable => write!(f, "The track is not available for streaming"),
             Error::TrackNotDownloadable => write!(f, "The track is not available for download"),
@@ -51,7 +56,9 @@ impl error::Error for Error {
             Error::JsonError(ref error) => error.description(),
             Error::TrackNotStreamable => "track is not streamable",
             Error::TrackNotDownloadable => "track is not downloadable",
+            Error::ParseError(ref error) => error.description(),
             Error::Io(ref error) => error.description(),
+            Error::UriError(ref error) => error.description(),
         }
     }
 
@@ -71,6 +78,12 @@ impl From<hyper::Error> for Error {
     }
 }
 
+impl From<hyper::error::UriError> for Error {
+    fn from(error: hyper::error::UriError) -> Error {
+        Error::UriError(error)
+    }
+}
+
 impl From<serde_json::Error> for Error {
     fn from(error: serde_json::Error) -> Error {
         Error::JsonError(error)
@@ -80,5 +93,11 @@ impl From<serde_json::Error> for Error {
 impl From<io::Error> for Error {
     fn from(error: io::Error) -> Error {
         Error::Io(error)
+    }
+}
+
+impl From<url::ParseError> for Error {
+    fn from(error: url::ParseError) -> Error {
+        Error::ParseError(error)
     }
 }

@@ -10,14 +10,16 @@
 //!
 //! This soundcloud library provides an interface where you can query soundcloud for information
 //! about tracks and users.
-#![feature(custom_derive, plugin)]
-#![plugin(serde_macros)]
+extern crate futures;
 extern crate hyper;
-extern crate url;
-#[macro_use]
+extern crate hyper_tls;
 extern crate log;
 extern crate serde;
+extern crate url;
+#[macro_use]
+extern crate serde_derive;
 extern crate serde_json;
+extern crate tokio_core;
 
 /// The static host address for the API.
 pub const API_HOST: &'static str = "api.soundcloud.com";
