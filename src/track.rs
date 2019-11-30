@@ -15,8 +15,8 @@ use futures::{Future, Stream};
 use url::Url;
 use serde_json;
 
-use error::{Error, Result};
-use client::{Client, User, App};
+use crate::error::{Error, Result};
+use crate::client::{Client, User, App};
 
 #[derive(Debug)]
 pub enum Filter {
@@ -183,15 +183,17 @@ impl<'a> SingleTrackRequestBuilder<'a> {
     }
 
     /// Sends the request and return the tracks.
-    pub fn get(&mut self) -> Box<Future<Item=Track, Error=Error>> {
+    pub fn get(&mut self) -> Box<dyn Future<Item=Track, Error=Error>> {
         let no_params: Option<&[(&str, &str)]> = None;
         let track = self.client.get(&format!("/tracks/{}", self.id), no_params)
             .map_err(|error| {
                 Error::HttpError(error)
             })
             .and_then(|response| {
-                response.body().concat2()
-                    .map_err(|error| {Error::HttpError(error)})
+                let (_, body) = response.into_parts();
+
+                body.map_err(|error| {Error::HttpError(error)})
+                    .concat2()
             })
             .and_then(move |body| {
                 serde_json::from_slice(&body)
@@ -280,7 +282,7 @@ impl<'a> TrackRequestBuilder<'a> {
 
     /// Performs the request and returns a list of tracks if there are any results, None otherwise,
     /// or an error if one occurred.
-    pub fn get(&mut self) -> Box<Future<Item=Option<Vec<Track>>, Error=Error>> {
+    pub fn get(&mut self) -> Box<dyn Future<Item=Option<Vec<Track>>, Error=Error>> {
         use serde_json::Value;
 
         let track_list = self.client.get("/tracks", Some(self.request_params()))
@@ -288,8 +290,10 @@ impl<'a> TrackRequestBuilder<'a> {
                 Error::HttpError(error)
             })
             .and_then(|response| {
-                response.body().concat2()
-                    .map_err(|error| {Error::HttpError(error)})
+                let (_, body) = response.into_parts();
+
+                body.map_err(|error| {Error::HttpError(error)})
+                    .concat2()
             })
             .and_then(move |body| {
                 serde_json::from_slice(&body)

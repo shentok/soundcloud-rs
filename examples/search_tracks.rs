@@ -33,7 +33,7 @@ fn main() {
     let soundcloud_client_id = std::env::var("SOUNDCLOUD_CLIENT_ID").expect("SOUNDCLOUD_CLIENT_ID");
     let mut core = tokio_core::reactor::Core::new().unwrap();
 
-    let client = soundcloud::Client::new(&soundcloud_client_id, &core.handle());
+    let client = soundcloud::Client::new(&soundcloud_client_id);
     let work = client.tracks().query(Some("noisia")).get()
         .and_then(|tracks| {
             match tracks {

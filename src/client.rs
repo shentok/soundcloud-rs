@@ -11,15 +11,15 @@ use url::Url;
 use hyper;
 use hyper_tls;
 use futures::future;
+use futures::Stream;
 use futures::future::Either;
-use futures::{Future, Stream};
-use tokio_core;
+use futures::{Future};
 
 use std::borrow::Borrow;
 use std::io::{Write};
 
-use track::{Track, TrackRequestBuilder, SingleTrackRequestBuilder};
-use error::{Error, Result};
+use crate::track::{Track, TrackRequestBuilder, SingleTrackRequestBuilder};
+use crate::error::{Error, Result};
 
 pub type Params<'a, K, V> = &'a [(K, V)];
 
@@ -124,10 +124,10 @@ impl Client {
     ///
     /// let client = Client::new(env!("SOUNDCLOUD_CLIENT_ID"));
     /// ```
-    pub fn new(client_id: &str, handle: &tokio_core::reactor::Handle) -> Client {
-        let client = hyper::Client::configure()
-            .connector(hyper_tls::HttpsConnector::new(4, &handle).unwrap())
-            .build(&handle);
+    pub fn new(client_id: &str) -> Client {
+        let https = hyper_tls::HttpsConnector::new(4).unwrap();
+        let client = hyper::Client::builder()
+            .build::<_, hyper::Body>(https);
         // client.set_redirect_policy(hyper::client::RedirectPolicy::FollowNone);
 
         Client {
@@ -162,7 +162,7 @@ impl Client {
     /// assert!(!buffer.is_empty());
     /// ```
     pub fn get<I, K, V>(&self, path: &str, params: Option<I>)
-        -> hyper::client::FutureResponse
+        -> hyper::client::ResponseFuture
     where I: IntoIterator, I::Item: Borrow<(K, V)>, K: AsRef<str>, V: AsRef<str> {
         let mut url = Url::parse(&format!("https://{}{}", super::API_HOST, path)).unwrap();
 
@@ -178,7 +178,7 @@ impl Client {
         self.http_client.get(uri)
     }
 
-    pub fn download<'a, 'b, W: 'a + Write>(&'a self, track: &'b Track, mut writer: W) -> Box<Future<Item=usize, Error=Error> + 'a> {
+    pub fn download<'a, 'b, W: 'a + Write>(&'a self, track: &'b Track, mut writer: W) -> Box<dyn Future<Item=usize, Error=Error> + 'a> {
         if !track.downloadable || !track.download_url.is_some() {
             return Box::new(future::err(Error::TrackNotDownloadable));
         }
@@ -188,8 +188,8 @@ impl Client {
         let response = self.http_client.get(url)
             .and_then(move |response| {
                 // Follow the redirect just this once.
-                if let Some(header) = response.headers().get::<hyper::header::Location>().cloned() {
-                    let uri = header.parse().unwrap();
+                if let Some(header) = response.headers().get(hyper::header::LOCATION) {
+                    let uri = header.to_str().unwrap().parse().unwrap();
                     let inner_response = self.http_client.get(uri);
                     Either::A(inner_response)
                 }
@@ -197,28 +197,27 @@ impl Client {
                     Either::B(future::ok(response))
                 }
             })
-            .map(move |response| {
-                response.body()
+            .map(move |response: hyper::Response<hyper::Body>| {
+                let (_, body) = response.into_parts();
+
+                body.map_err(|error| { Error::HttpError(error) })
                     .fold(0, move |acc, chunk| {
                         let result = match writer.write(chunk.as_ref()) {
                             Ok(num_written) => Ok(acc + num_written),
-                            error => error,
+                            Err(error) => Err(Error::Io(error)),
                         };
 
                         result
                     })
             })
-            .flatten()
-            .map_err(|error| {
-                Error::HttpError(error)
-            });
+            .flatten();
 
         Box::new(response)
     }
 
     /// Starts streaming the track provided in the tracks `stream_url` to the `writer` if the track
     /// is streamable via the API.
-    pub fn stream<'a, 'b, W: 'a + Write>(&'a self, track: &'b Track, mut writer: W) -> Box<Future<Item=usize, Error=Error> + 'a>  {
+    pub fn stream<'a, 'b, W: 'a + Write>(&'a self, track: &'b Track, mut writer: W) -> Box<dyn Future<Item=usize, Error=Error> + 'a>  {
         if !track.streamable || !track.stream_url.is_some() {
             return Box::new(future::err(Error::TrackNotStreamable));
         }
@@ -228,8 +227,8 @@ impl Client {
         let response = self.http_client.get(url)
             .and_then(move |response| {
                 // Follow the redirect just this once.
-                if let Some(header) = response.headers().get::<hyper::header::Location>().cloned() {
-                    let uri = header.parse().unwrap();
+                if let Some(header) = response.headers().get(hyper::header::LOCATION) {
+                    let uri = header.to_str().unwrap().parse().unwrap();
                     let inner_response = self.http_client.get(uri);
                     Either::A(inner_response)
                 }
@@ -238,34 +237,33 @@ impl Client {
                 }
             })
             .map(move |response| {
-                response.body()
+                let (_, body) = response.into_parts();
+
+                body.map_err(|error| { Error::HttpError(error) })
                     .fold(0, move |acc, chunk| {
                         let result = match writer.write(chunk.as_ref()) {
                             Ok(num_written) => Ok(acc + num_written),
-                            error => error,
+                            Err(error) => Err(Error::Io(error)),
                         };
 
                         result
                     })
             })
-            .flatten()
-            .map_err(|error| {
-                Error::HttpError(error)
-            });
+            .flatten();
 
         Box::new(response)
     }
 
     /// Resolves any soundcloud resource and returns it as a `Url`.
-    pub fn resolve(&self, url: &str) -> Box<Future<Item=Url, Error=Error>> {
+    pub fn resolve(&self, url: &str) -> Box<dyn Future<Item=Url, Error=Error>> {
         let uri = self.get("/resolve", Some(&[("url", url)]));
 
         let response = uri
             .map_err(|error| { Error::HttpError(error) })
             .and_then(|response| {
-                match response.headers().get::<hyper::header::Location>() {
+                match response.headers().get(hyper::header::LOCATION) {
                     Some(header) => {
-                        future::ok(Url::parse(header.as_ref()).unwrap())
+                        future::ok(Url::parse(header.to_str().unwrap().as_ref()).unwrap())
                     },
                     _ => {
                         future::err(Error::ApiError("expected location header".to_owned()))
@@ -321,15 +319,15 @@ mod tests {
     use url::Url;
     use super::*;
 
-    fn client(handle: &tokio_core::reactor::Handle) -> Client {
-        Client::new(env!("SOUNDCLOUD_CLIENT_ID"), handle)
+    fn client() -> Client {
+        Client::new(env!("SOUNDCLOUD_CLIENT_ID"))
     }
 
     #[test]
     fn test_resolve_track() {
         let mut core = tokio_core::reactor::Core::new().unwrap();
 
-        let work = client(&core.handle()).resolve("https://soundcloud.com/isqa/tree-eater-1");
+        let work = client().resolve("https://soundcloud.com/isqa/tree-eater-1");
 
         let result = core.run(work);
 
@@ -342,7 +340,7 @@ mod tests {
     fn test_get_tracks() {
         let mut core = tokio_core::reactor::Core::new().unwrap();
 
-        let work = client(&core.handle()).tracks().query(Some("d0df0dt snuffx")).get();
+        let work = client().tracks().query(Some("d0df0dt snuffx")).get();
 
         let result = core.run(work);
 
@@ -353,7 +351,7 @@ mod tests {
     fn test_get_track() {
         let mut core = tokio_core::reactor::Core::new().unwrap();
 
-        let work = client(&core.handle()).tracks().id(18201932).get();
+        let work = client().tracks().id(18201932).get();
 
         let track = core.run(work).unwrap();
 
@@ -367,7 +365,7 @@ mod tests {
 
         let mut core = tokio_core::reactor::Core::new().unwrap();
 
-        let client = client(&core.handle());
+        let client = client();
         let path = Path::new("hi.mp3");
         let mut file = fs::File::create(path).unwrap();
         let work = client.tracks().id(263801976).get()
@@ -387,7 +385,7 @@ mod tests {
         {
             let mut core = tokio_core::reactor::Core::new().unwrap();
 
-            let client = client(&core.handle());
+            let client = client();
             let work = client.tracks().id(262681089).get()
                 .and_then(|track| client.stream(&track, &mut buffer));
 
