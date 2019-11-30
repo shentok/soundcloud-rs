@@ -26,7 +26,7 @@ pub enum Error {
     HttpError(hyper::Error),
     InvalidFilter(String),
     Io(io::Error),
-    UriError(hyper::error::UriError),
+    UriError(hyper::http::uri::InvalidUri),
     TrackNotDownloadable,
     TrackNotStreamable,
 }
@@ -62,7 +62,7 @@ impl error::Error for Error {
         }
     }
 
-    fn cause(&self) -> Option<&error::Error> {
+    fn cause(&self) -> Option<&dyn error::Error> {
         match *self {
             Error::JsonError(ref error) => Some(error),
             Error::HttpError(ref error) => Some(error),
@@ -78,8 +78,8 @@ impl From<hyper::Error> for Error {
     }
 }
 
-impl From<hyper::error::UriError> for Error {
-    fn from(error: hyper::error::UriError) -> Error {
+impl From<hyper::http::uri::InvalidUri> for Error {
+    fn from(error: hyper::http::uri::InvalidUri) -> Error {
         Error::UriError(error)
     }
 }
