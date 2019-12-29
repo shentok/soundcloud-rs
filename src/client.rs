@@ -125,7 +125,7 @@ impl Client {
     /// let client = Client::new(env!("SOUNDCLOUD_CLIENT_ID"));
     /// ```
     pub fn new(client_id: &str) -> Client {
-        let https = hyper_tls::HttpsConnector::new(4).unwrap();
+        let https = hyper_tls::HttpsConnector::new();
         let client = hyper::Client::builder().build::<_, hyper::Body>(https);
         // client.set_redirect_policy(hyper::client::RedirectPolicy::FollowNone);
 
