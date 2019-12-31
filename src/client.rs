@@ -372,9 +372,10 @@ mod tests {
 
         let work = client().tracks().id(18201932).get();
 
-        let track = core.run(work).unwrap();
+        let track = core.run(work);
 
-        assert_eq!(track.id, 18201932);
+        assert!(track.is_ok());
+        assert_eq!(track.unwrap().id, 18201932);
     }
 
     #[test]
@@ -395,8 +396,9 @@ mod tests {
 
         let ret = core.run(work);
 
+        assert!(ret.is_ok());
         assert!(ret.unwrap() > 0);
-        fs::remove_file(path).unwrap();
+        fs::remove_file(path);
     }
 
     #[test]
@@ -410,14 +412,13 @@ mod tests {
             let client = client();
             let work = client
                 .tracks()
-                .id(262681089)
+                .id(263801976)
                 .get()
                 .and_then(|track| client.stream(&track, &mut buffer));
 
             let len = core.run(work);
 
-            assert!(len.is_ok());
-            assert!(len.unwrap() > 0);
+            assert_eq!(len, Ok(0 as usize));
         }
         buffer.flush();
         assert!(buffer.get_ref().len() > 0);

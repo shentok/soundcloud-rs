@@ -47,21 +47,77 @@ impl fmt::Display for Error {
     }
 }
 
-impl error::Error for Error {
-    fn description(&self) -> &str {
+impl PartialEq<Error> for Error {
+    fn eq(&self, other: &Self) -> bool {
         match *self {
-            Error::InvalidFilter(_) => "invalid filter",
-            Error::ApiError(_) => "api error",
-            Error::HttpError(ref error) => error.description(),
-            Error::JsonError(ref error) => error.description(),
-            Error::TrackNotStreamable => "track is not streamable",
-            Error::TrackNotDownloadable => "track is not downloadable",
-            Error::ParseError(ref error) => error.description(),
-            Error::Io(ref error) => error.description(),
-            Error::UriError(ref error) => error.description(),
+            Error::JsonError(ref lhs) => {
+                if let Error::JsonError(ref rhs) = other {
+                    lhs.to_string() == rhs.to_string()
+                } else {
+                    false
+                }
+            }
+            Error::HttpError(ref lhs) => {
+                if let Error::HttpError(ref rhs) = other {
+                    lhs.to_string() == rhs.to_string()
+                } else {
+                    false
+                }
+            }
+            Error::ApiError(ref lhs) => {
+                if let Error::ApiError(ref rhs) = other {
+                    lhs == rhs
+                } else {
+                    false
+                }
+            }
+            Error::ParseError(ref lhs) => {
+                if let Error::ParseError(ref rhs) = other {
+                    lhs == rhs
+                } else {
+                    false
+                }
+            }
+            Error::Io(_) => {
+                if let Error::Io(_) = other {
+                    self.to_string() == other.to_string()
+                } else {
+                    false
+                }
+            }
+            Error::UriError(ref lhs) => {
+                if let Error::UriError(ref rhs) = other {
+                    lhs.to_string() == rhs.to_string()
+                } else {
+                    false
+                }
+            }
+            Error::InvalidFilter(ref lhs) => {
+                if let Error::InvalidFilter(ref rhs) = other {
+                    lhs == rhs
+                } else {
+                    false
+                }
+            }
+            Error::TrackNotStreamable => {
+                if let Error::TrackNotDownloadable = other {
+                    true
+                } else {
+                    false
+                }
+            }
+            Error::TrackNotDownloadable => {
+                if let Error::TrackNotDownloadable = other {
+                    true
+                } else {
+                    false
+                }
+            }
         }
     }
+}
 
+impl error::Error for Error {
     fn cause(&self) -> Option<&dyn error::Error> {
         match *self {
             Error::JsonError(ref error) => Some(error),
