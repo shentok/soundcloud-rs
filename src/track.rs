@@ -10,17 +10,17 @@
 use std::fmt;
 use std::str;
 
-use url::Url;
 use serde_json;
+use url::Url;
 
+use client::{App, Client, User};
 use error::{Error, Result};
-use client::{Client, User, App};
 
 #[derive(Debug)]
 pub enum Filter {
     All,
     Public,
-    Private
+    Private,
 }
 
 impl str::FromStr for Filter {
@@ -162,7 +162,7 @@ pub struct TrackRequestBuilder<'a> {
     duration: Option<(usize, usize)>,
     bpm: Option<(usize, usize)>,
     genres: Option<String>,
-    types: Option<String>
+    types: Option<String>,
 }
 
 #[derive(Debug)]
@@ -196,7 +196,6 @@ impl<'a> SingleTrackRequestBuilder<'a> {
     }
 }
 
-
 impl<'a> TrackRequestBuilder<'a> {
     /// Creates a new track request builder, with no set parameters.
     pub fn new(client: &'a Client) -> TrackRequestBuilder {
@@ -216,14 +215,19 @@ impl<'a> TrackRequestBuilder<'a> {
 
     /// Sets the search query filter, which will only return tracks with a matching query.
     pub fn query<S>(&'a mut self, query: Option<S>) -> &mut TrackRequestBuilder
-        where S: AsRef<str> {
+    where
+        S: AsRef<str>,
+    {
         self.query = query.map(|s| s.as_ref().to_owned());
         self
     }
 
     /// Sets the tags filter, which will only return tracks with a matching tag.
     pub fn tags<I, T>(&'a mut self, tags: Option<I>) -> &mut TrackRequestBuilder
-        where I: AsRef<[T]>, T: AsRef<str> {
+    where
+        I: AsRef<[T]>,
+        T: AsRef<str>,
+    {
         self.tags = tags.map(|s| {
             let tags_as_ref: Vec<_> = s.as_ref().iter().map(T::as_ref).collect();
             tags_as_ref.join(",")
@@ -232,7 +236,10 @@ impl<'a> TrackRequestBuilder<'a> {
     }
 
     pub fn genres<I, T>(&'a mut self, genres: Option<I>) -> &mut TrackRequestBuilder
-        where I: AsRef<[T]>, T: AsRef<str> {
+    where
+        I: AsRef<[T]>,
+        T: AsRef<str>,
+    {
         self.genres = genres.map(|s| {
             let genres_as_ref: Vec<_> = s.as_ref().iter().map(T::as_ref).collect();
             genres_as_ref.join(",")
@@ -278,14 +285,18 @@ impl<'a> TrackRequestBuilder<'a> {
             if track_list.is_empty() {
                 return Ok(None);
             } else {
-               let tracks: Vec<Track> = track_list
-                    .iter().map(|t| serde_json::from_value::<Track>(t.clone()).unwrap()).collect();
+                let tracks: Vec<Track> = track_list
+                    .iter()
+                    .map(|t| serde_json::from_value::<Track>(t.clone()).unwrap())
+                    .collect();
 
-                return Ok(Some(tracks)); 
+                return Ok(Some(tracks));
             }
         }
 
-        return Err(Error::ApiError("expected response to be an array".to_owned()));
+        return Err(Error::ApiError(
+            "expected response to be an array".to_owned(),
+        ));
     }
 
     fn request_params(&self) -> Vec<(&str, String)> {

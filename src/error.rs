@@ -9,8 +9,8 @@
 
 use std::error;
 use std::fmt;
-use std::result;
 use std::io;
+use std::result;
 
 use hyper;
 use serde_json;
@@ -60,7 +60,7 @@ impl error::Error for Error {
             Error::JsonError(ref error) => Some(error),
             Error::HttpError(ref error) => Some(error),
             Error::Io(ref error) => Some(error),
-            _ => None
+            _ => None,
         }
     }
 }

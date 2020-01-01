@@ -7,15 +7,15 @@
 // option. This file may not be copied, modified, or distributed
 // except according to those terms.
 
-use url::Url;
 use hyper;
+use url::Url;
 
-use std::result;
 use std::borrow::Borrow;
 use std::io::{self, Write};
+use std::result;
 
-use track::{Track, TrackRequestBuilder, SingleTrackRequestBuilder};
 use error::{Error, Result};
+use track::{SingleTrackRequestBuilder, Track, TrackRequestBuilder};
 
 pub type Params<'a, K, V> = &'a [(K, V)];
 
@@ -85,15 +85,15 @@ pub struct User {
     /// Description, written by the user.
     pub description: Option<String>,
     /// Discogs name.
-    #[serde(rename="discogs-name")]
+    #[serde(rename = "discogs-name")]
     pub discogs_name: Option<String>, // discogs-name
     /// MySpace name.
-    #[serde(rename="myspace-name")]
+    #[serde(rename = "myspace-name")]
     pub myspace_name: Option<String>, // myspace-name
     /// URL to a website.
     pub website: Option<String>,
     /// Custom title for the website.
-    #[serde(rename="website-title")]
+    #[serde(rename = "website-title")]
     pub website_title: Option<String>, // website-title
     /// Online status.
     pub online: Option<bool>,
@@ -155,9 +155,17 @@ impl Client {
     ///
     /// assert!(!buffer.is_empty());
     /// ```
-    pub fn get<I, K, V>(&self, path: &str, params: Option<I>)
-        -> result::Result<hyper::client::Response, hyper::Error>
-    where I: IntoIterator, I::Item: Borrow<(K, V)>, K: AsRef<str>, V: AsRef<str> {
+    pub fn get<I, K, V>(
+        &self,
+        path: &str,
+        params: Option<I>,
+    ) -> result::Result<hyper::client::Response, hyper::Error>
+    where
+        I: IntoIterator,
+        I::Item: Borrow<(K, V)>,
+        K: AsRef<str>,
+        V: AsRef<str>,
+    {
         let mut url = Url::parse(&format!("https://{}{}", super::API_HOST, path)).unwrap();
 
         {
@@ -260,15 +268,16 @@ impl Client {
     /// Parses a string and returns a url with the client_id query parameter set.
     fn parse_url<S: AsRef<str>>(&self, url: S) -> Url {
         let mut url = Url::parse(url.as_ref()).unwrap();
-        url.query_pairs_mut().append_pair("client_id", &self.client_id);
+        url.query_pairs_mut()
+            .append_pair("client_id", &self.client_id);
         url
     }
 }
 
 #[cfg(test)]
 mod tests {
-    use url::Url;
     use super::*;
+    use url::Url;
 
     fn client() -> Client {
         Client::new(env!("SOUNDCLOUD_CLIENT_ID"))
@@ -278,9 +287,14 @@ mod tests {
     fn test_resolve_track() {
         let result = client().resolve("https://soundcloud.com/isqa/tree-eater-1");
 
-        assert_eq!(result.unwrap(),
-            Url::parse(&format!("https://api.soundcloud.com/tracks/262976655?client_id={}", 
-                                env!("SOUNDCLOUD_CLIENT_ID"))).unwrap());
+        assert_eq!(
+            result.unwrap(),
+            Url::parse(&format!(
+                "https://api.soundcloud.com/tracks/262976655?client_id={}",
+                env!("SOUNDCLOUD_CLIENT_ID")
+            ))
+            .unwrap()
+        );
     }
 
     #[test]
